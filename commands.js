@@ -1,8 +1,3 @@
-// ============================================================
-// commands.js — v2027.1 الكامل
-// ============================================================
-module.exports = { SECTIONS, buildMainKeyboard, buildSectionKeyboard, findCommand, INPUT_PROMPTS };
-
 const SECTIONS = {
     '🔍 استطلاع': {
         '🔍 بصمة النظام':      'sysinfo',
@@ -157,4 +152,12 @@ function findCommand(text) {
         if (sec[text]) return sec[text];
     }
     return null;
-      }
+}
+
+module.exports = {
+    SECTIONS,
+    buildMainKeyboard,
+    buildSectionKeyboard,
+    findCommand,
+    INPUT_PROMPTS
+};
